@@ -13,14 +13,13 @@ import pandas as pd
 def job_func(task):
     return 10
 
-def event_pool(task_resources, result_list, pool_size):
-    #print("gevent_pool task num {}".format(len(task_resources)))
-    #print("gevent_pool pool_size {}".format(pool_size))
-    print('hello')
+def event_pool(task_resources, map_func, result_list, pool_size):
+    print("gevent_pool task num {}".format(len(task_resources)))
+    print("gevent_pool pool_size {}".format(pool_size))
     p = pool.Pool(pool_size)
     jobs = []
     for task_resource in task_resources:
-        job = p.spawn(job_func, task_resource)
+        job = p.spawn(map_func, task_resource)
         jobs.append(job)
     try:
         gevent.joinall(jobs)
@@ -34,24 +33,32 @@ class ParallelExecutor():
     该工具类提供了通用的并发执行框架，能够实现线程+协程级别的并发计算。
     """
     def __init__(self):
-        self._n_jobs = None
+        self._n_threads = None
         self._task_resources_list = None
         self._map_func = None
         self._n_routines = None
 
     def _multiprocess_execute(self):
-        self._n_jobs = len(self._task_resources_list)
-        print("n_jobs = {}".format(self._n_jobs))
-        pool = Pool(processes=self._n_jobs)
+        self._n_threads = len(self._task_resources_list)
+        print("thread nums = {}".format(self._n_threads))
+        pool = Pool(processes=self._n_threads)
         result_list = Manager().list()
 
         for task_resources in self._task_resources_list:
-            print("task resources {}".format(len(task_resources)))
-            pool.apply_async(event_pool, (task_resources, result_list, self._n_routines))
+            print("task_resources len = {}".format(len(task_resources)))
+            print("self._n_routines = {}".format(self._n_routines))
+            pool.apply_async(event_pool, (task_resources, self._map_func, result_list, self._n_routines))
         pool.close()
         pool.join()
         return result_list
 
+    def print_resources_list(self, resources_list):
+        for resources in resources_list:
+            for resource in resources:
+                print(resource[0])
+                print(resource[1])
+                print(resource[2])
+                print(resource[3])
     def run(self, task_resources_list, map_func, reduce_func=None, n_routines=2):
         """
         执行并发运算
@@ -69,14 +76,20 @@ class ParallelExecutor():
         :return: 如果reduce_func为None，则将reduce_func在多个协程内执行后返回的结果组成一个list返回，
             否则，将结果list传给reduce_func，然后将reduce_func的结果返回
         """
+        #self.print_resources_list(task_resources_list)
         self._task_resources_list = task_resources_list
+        #self._task_resources_list = [[1, 2, 3], [11, 22, 33]]
         self._map_func = map_func
         self._n_routines = n_routines
 
         results = self._multiprocess_execute()
-        print(results)
+        #print("result = {}".format(results))
 
-        #if reduce_func is None:
-        #    return results
-        #else:
-        #    return reduce_func(results)
+        if reduce_func is None:
+            return results
+        else:
+            return reduce_func(results)
+
+if __name__ == '__main__':
+    pe = ParallelExecutor()
+    pe.run([[1, 2, 3], [11, 22, 33]], job_func)
