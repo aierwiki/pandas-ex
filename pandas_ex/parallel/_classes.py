@@ -8,7 +8,26 @@ import gevent
 from gevent import monkey, pool, Timeout
 from multiprocessing import Pool, Manager, cpu_count
 import joblib
+import pandas as pd
 
+def job_func(task):
+    return 10
+
+def event_pool(task_resources, result_list, pool_size):
+    #print("gevent_pool task num {}".format(len(task_resources)))
+    #print("gevent_pool pool_size {}".format(pool_size))
+    print('hello')
+    p = pool.Pool(pool_size)
+    jobs = []
+    for task_resource in task_resources:
+        job = p.spawn(job_func, task_resource)
+        jobs.append(job)
+    try:
+        gevent.joinall(jobs)
+    except Exception as e:
+        print(e)
+    for job in jobs:
+        result_list.append(job.get())
 
 class ParallelExecutor():
     """
@@ -20,20 +39,6 @@ class ParallelExecutor():
         self._map_func = None
         self._n_routines = None
 
-    def _gevent_pool(self, task_resources, result_list, pool_size):
-        print("gevent_pool {}".format(len(task_resources)))
-        p = pool.Pool(pool_size)
-        jobs = []
-        for task_resource in task_resources:
-            job = p.spawn(self._map_func, task_resource)
-            jobs.append(job)
-        try:
-            gevent.joinall(jobs)
-        except Exception as e:
-            print(e)
-        for job in jobs:
-            result_list.append(job.get())
-
     def _multiprocess_execute(self):
         self._n_jobs = len(self._task_resources_list)
         print("n_jobs = {}".format(self._n_jobs))
@@ -41,9 +46,8 @@ class ParallelExecutor():
         result_list = Manager().list()
 
         for task_resources in self._task_resources_list:
-            print("task results {}".format(task_resources))
-            pool.apply_async(self._gevent_pool,
-                             (task_resources, result_list, self._n_routines))
+            print("task resources {}".format(len(task_resources)))
+            pool.apply_async(event_pool, (task_resources, result_list, self._n_routines))
         pool.close()
         pool.join()
         return result_list
@@ -70,9 +74,9 @@ class ParallelExecutor():
         self._n_routines = n_routines
 
         results = self._multiprocess_execute()
-        print(len(results))
+        print(results)
 
-        if reduce_func is None:
-            return results
-        else:
-            return reduce_func(results)
+        #if reduce_func is None:
+        #    return results
+        #else:
+        #    return reduce_func(results)
