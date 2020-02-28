@@ -13,23 +13,6 @@ import math
 from ..parallel import ParallelExecutor
 
 
-def job_func(task):
-    return 10
-
-"""
-def parallel_executor_map_func_for_map(task_resource):
-    task_id = task_resource[0]
-    df = task_resource[1]
-    map_func = task_resource[2]
-    verbose = task_resource[3]
-    if verbose > 0:
-        print("start task {} ...".format(task_id))
-    df[self._col_dst] = df[self._col_src].map(lambda x: map_func(x))
-    if verbose > 0:
-        print("task {} finished !".format(task_id))
-    return df
-"""
-
 class DataFrameHelper():
     """
     该类的提供多线程读取文件和多线程进行map操作的功能函数
@@ -55,13 +38,9 @@ class DataFrameHelper():
     def _parallel_executor_map_func_for_map(self, task_resource):
         task_id = task_resource[0]
         df = task_resource[1]
-        map_func = task_resource[2]
-        verbose = task_resource[3]
-        if verbose > 0:
-            print("start task {} ...".format(task_id))
-        df[self._col_dst] = df[self._col_src].map(lambda x: map_func(x))
-        if verbose > 0:
-            print("task {} finished !".format(task_id))
+        self._log("start task {} ...".format(task_id))
+        df[self._col_dst] = df[self._col_src].map(lambda x: self._map_func(x))
+        self._log("task {} finished !".format(task_id))
         return (task_id, df)
 
     def _parallel_executor_reduce_func_for_map(self, result_list):
@@ -110,19 +89,14 @@ class DataFrameHelper():
             task_resources = []
             for j in range(self._n_tasks_per_thread):
                 start_pos = task_cnt * num_per_task
-                print("start pos = {}".format(start_pos))
-                print("dataframe_len = {}".format(dataframe_len))
                 if start_pos >= dataframe_len:
                     continue
                 end_pos = (task_cnt + 1) * num_per_task
                 if (i == self._n_threads - 1) and (j == self._n_tasks_per_thread - 1):
-                    #task_resources.append((task_cnt, self._df.iloc[start_pos:], map_func, verbose))
-                    task_resources.append((task_cnt, self._df.iloc[start_pos:], map_func,  verbose))
+                    task_resources.append((task_cnt, self._df.iloc[start_pos:]))
                 else:
-                    #task_resources.append((task_cnt, self._df.iloc[start_pos:end_pos], map_func, verbose))
-                    task_resources.append((task_cnt, self._df.iloc[start_pos:end_pos], map_func, verbose))
+                    task_resources.append((task_cnt, self._df.iloc[start_pos:end_pos]))
                 task_cnt += 1
-            print("len task_resources = {}".format(len(task_resources)))
             task_resources_list.append(task_resources)
 
         result = self._parallel_executor.run(task_resources_list, self._parallel_executor_map_func_for_map,
@@ -130,9 +104,3 @@ class DataFrameHelper():
                                                 n_routines=n_routines)
 
         return result
-
-
-if __name__ == "__main__":
-    df = pd.DataFrame({'a':[1, 2, 3, 4, 5, 6, 7]})
-    df_helper = DataFrameHelper(df)
-    df_new = df_helper.parallel_map('b','a', lambda x : x + 10)
